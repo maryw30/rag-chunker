@@ -128,7 +128,7 @@ def _chunk_section(heading_path, blocks, max_tokens, overlap, heading_prefix):
         text_value = _render(prefix, body)
         token_estimate = estimate_tokens(text_value)
         oversized = token_estimate > max_tokens and any(
-            piece.block.type in ("code", "table") for piece in current
+            piece.block.type in ("code", "table", "list") for piece in current
         )
         results.append(
             Chunk(
