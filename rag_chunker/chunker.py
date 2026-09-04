@@ -2,7 +2,7 @@ import json
 from collections import namedtuple
 from dataclasses import dataclass, field
 
-from .blocks import parse_blocks
+from .blocks import parse_blocks, split_list_items
 from .sentences import split_sentences
 from .tokens import estimate_tokens
 
@@ -85,6 +85,9 @@ def _build_pieces(blocks):
         if block.type == "paragraph":
             for sentence in split_sentences(block.text):
                 pieces.append(_Piece(sentence, block, False))
+        elif block.type == "list":
+            for item in split_list_items(block):
+                pieces.append(_Piece(item.text, item, True))
         else:
             pieces.append(_Piece(block.text, block, True))
     return pieces

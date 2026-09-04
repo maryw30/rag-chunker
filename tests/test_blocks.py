@@ -1,4 +1,4 @@
-from rag_chunker.blocks import Block, parse_blocks
+from rag_chunker.blocks import Block, parse_blocks, split_list_items
 
 
 def test_heading_strips_trailing_hashes():
@@ -98,3 +98,29 @@ def test_paragraph_stops_at_a_following_heading():
 def test_empty_document_has_no_blocks():
     assert parse_blocks("") == []
     assert parse_blocks("\n\n\n") == []
+
+
+def test_split_list_items_gives_one_block_per_item_with_correct_lines():
+    text = "- item one\n- item two\n- item three\n"
+    block = parse_blocks(text)[0]
+    items = split_list_items(block)
+    assert [item.text for item in items] == ["- item one", "- item two", "- item three"]
+    assert [(item.start_line, item.end_line) for item in items] == [(1, 1), (2, 2), (3, 3)]
+    assert all(item.type == "list" for item in items)
+
+
+def test_split_list_items_keeps_continuation_lines_with_their_item():
+    text = "- item one\n  continued text\n- item two\n"
+    block = parse_blocks(text)[0]
+    items = split_list_items(block)
+    assert items[0].text == "- item one\n  continued text"
+    assert items[0].start_line == 1
+    assert items[0].end_line == 2
+    assert items[1].text == "- item two"
+    assert items[1].start_line == 3
+    assert items[1].end_line == 3
+
+
+def test_split_list_items_on_non_list_block_returns_it_unchanged():
+    block = parse_blocks("Just a paragraph.\n")[0]
+    assert split_list_items(block) == [block]

@@ -83,6 +83,23 @@ def _starts_new_block(lines, i, n):
     return False
 
 
+def split_list_items(block):
+    # continuation lines (indented text under an item) stay attached to that item
+    lines = block.text.splitlines()
+    boundaries = [i for i, line in enumerate(lines) if _LIST_ITEM_RE.match(line)]
+    if not boundaries:
+        return [block]
+
+    items = []
+    line_no = block.start_line
+    for idx, start in enumerate(boundaries):
+        end = boundaries[idx + 1] if idx + 1 < len(boundaries) else len(lines)
+        item_lines = lines[start:end]
+        items.append(Block("list", "\n".join(item_lines), line_no, line_no + len(item_lines) - 1, 0))
+        line_no += len(item_lines)
+    return items
+
+
 def _parse_code_block(lines, start, n):
     fence_char = lines[start].strip()[0]
     fence_len = len(lines[start].strip()) - len(lines[start].strip().lstrip(fence_char))

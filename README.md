@@ -10,9 +10,13 @@ miss that is hard to trace. `rag-chunker` fixes them at chunking time:
 
 - **Chunks never span a heading**, and each chunk carries its heading path as a
   context prefix (`Runbook > Checks > Rollback`).
-- **Code blocks, tables and list runs are atomic.** They are emitted whole, and
-  flagged as `oversized` if that means exceeding the budget, so you can decide
-  what to do rather than discovering half a function in your index.
+- **Code blocks and tables are atomic.** They are emitted whole, and flagged as
+  `oversized` if that means exceeding the budget, so you can decide what to do
+  rather than discovering half a function in your index.
+- **List items pack individually**, like sentences in a paragraph, so a long
+  list fills chunks efficiently instead of forcing the whole list into one
+  oversized chunk. A single item that alone exceeds the budget is still
+  flagged as `oversized`.
 - **Long paragraphs fall back to sentence boundaries**, with an abbreviation
   guard so `e.g.`, `Dr. Chen` and `v1.4` do not create fragments.
 - **Configurable overlap** repeats trailing prose in the next chunk, and resets
@@ -95,7 +99,7 @@ for chunk in chunks:
     chunk.start_line      # 1-based, points back at the source file
     chunk.end_line
     chunk.token_estimate
-    chunk.oversized       # True only for an indivisible code block, table, or list
+    chunk.oversized       # True only for an indivisible code block, table, or list item
     chunk.to_dict()       # the JSONL record
 ```
 

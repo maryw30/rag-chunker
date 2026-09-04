@@ -47,11 +47,27 @@ def test_code_block_flagged_oversized_when_it_exceeds_the_budget():
     assert chunks[0].oversized is True
 
 
-def test_list_block_flagged_oversized_when_it_exceeds_the_budget():
-    doc = "# T\n\n" + "\n".join(f"- item {i} with some extra words" for i in range(20)) + "\n"
+def test_a_single_oversized_list_item_is_flagged_oversized():
+    doc = "# T\n\n- item with some extra words that will not fit\n"
     chunks = chunk_markdown(doc, max_tokens=5, overlap=0)
     assert len(chunks) == 1
     assert chunks[0].oversized is True
+
+
+def test_short_list_items_pack_into_one_chunk_instead_of_staying_atomic():
+    doc = "# T\n\n- a\n- b\n- c\n"
+    chunks = chunk_markdown(doc, max_tokens=512, overlap=0)
+    assert len(chunks) == 1
+    assert chunks[0].oversized is False
+    assert chunks[0].body == "- a\n\n- b\n\n- c"
+
+
+def test_list_items_split_across_chunks_get_correct_line_ranges():
+    doc = "# T\n\n" + "\n".join(f"- item {i} with some extra words" for i in range(20)) + "\n"
+    chunks = chunk_markdown(doc, max_tokens=8, overlap=0)
+    assert len(chunks) > 1
+    assert chunks[0].start_line == 3
+    assert chunks[-1].end_line == 22
 
 
 def test_small_paragraph_is_not_flagged_oversized():
