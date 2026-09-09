@@ -2,7 +2,7 @@ import json
 from collections import namedtuple
 from dataclasses import dataclass, field
 
-from .blocks import parse_blocks, split_list_items
+from .blocks import parse_blocks, split_list_items, split_table_rows
 from .sentences import split_sentences
 from .tokens import estimate_tokens
 
@@ -88,6 +88,9 @@ def _build_pieces(blocks):
         elif block.type == "list":
             for item in split_list_items(block):
                 pieces.append(_Piece(item.text, item, True))
+        elif block.type == "table":
+            for row in split_table_rows(block):
+                pieces.append(_Piece(row.text, row, True))
         else:
             pieces.append(_Piece(block.text, block, True))
     return pieces

@@ -70,6 +70,33 @@ def test_list_items_split_across_chunks_get_correct_line_ranges():
     assert chunks[-1].end_line == 22
 
 
+def test_table_rows_split_across_chunks_get_correct_line_ranges():
+    doc = (
+        "# T\n\n"
+        "| a | b |\n| -- | -- |\n"
+        + "\n".join(f"| row {i} | value {i} with extra words |" for i in range(10))
+        + "\n"
+    )
+    chunks = chunk_markdown(doc, max_tokens=8, overlap=0)
+    assert len(chunks) > 1
+    assert chunks[0].start_line == 3
+    assert chunks[-1].end_line == 14
+
+
+def test_short_table_rows_pack_into_one_chunk_instead_of_staying_atomic():
+    doc = "# T\n\n| a | b |\n| -- | -- |\n| 1 | 2 |\n| 3 | 4 |\n"
+    chunks = chunk_markdown(doc, max_tokens=512, overlap=0)
+    assert len(chunks) == 1
+    assert chunks[0].oversized is False
+
+
+def test_a_single_oversized_table_row_is_flagged_oversized():
+    doc = "# T\n\n| a | b |\n| -- | -- |\n| " + "x" * 200 + " | y |\n"
+    chunks = chunk_markdown(doc, max_tokens=5, overlap=0)
+    assert len(chunks) == 1
+    assert chunks[0].oversized is True
+
+
 def test_small_paragraph_is_not_flagged_oversized():
     doc = "# T\n\nShort.\n"
     chunks = chunk_markdown(doc, max_tokens=512, overlap=0)

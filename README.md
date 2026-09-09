@@ -10,13 +10,15 @@ miss that is hard to trace. `rag-chunker` fixes them at chunking time:
 
 - **Chunks never span a heading**, and each chunk carries its heading path as a
   context prefix (`Runbook > Checks > Rollback`).
-- **Code blocks and tables are atomic.** They are emitted whole, and flagged as
+- **Code blocks are atomic.** They are emitted whole, and flagged as
   `oversized` if that means exceeding the budget, so you can decide what to do
   rather than discovering half a function in your index.
-- **List items pack individually**, like sentences in a paragraph, so a long
-  list fills chunks efficiently instead of forcing the whole list into one
-  oversized chunk. A single item that alone exceeds the budget is still
-  flagged as `oversized`.
+- **List items and table rows pack individually**, like sentences in a
+  paragraph, so a long list or table fills chunks efficiently instead of
+  forcing the whole block into one oversized chunk. Table rows carry their
+  header and separator row with them when split, so a lone row is still
+  readable on its own. A single item or row that alone exceeds the budget is
+  still flagged as `oversized`.
 - **Long paragraphs fall back to sentence boundaries**, with an abbreviation
   guard so `e.g.`, `Dr. Chen` and `v1.4` do not create fragments.
 - **Configurable overlap** repeats trailing prose in the next chunk, and resets
@@ -61,9 +63,9 @@ $ rag-chunker doc.md --max-tokens 60 --overlap 20 --stats
 6 chunks | tokens min 23 avg 48 max 68 | 1 oversized
 ```
 
-The one oversized chunk is the checks table: 68 tokens against a 60 token
-budget, emitted whole because splitting a table off its header row makes both
-halves useless.
+The one oversized chunk is a single row of the checks table: 68 tokens against
+a 60 token budget. The row keeps the table's header and separator attached, so
+it is still readable on its own, just bigger than the budget allows.
 
 Feed the output to an embedder directly:
 
@@ -99,7 +101,7 @@ for chunk in chunks:
     chunk.start_line      # 1-based, points back at the source file
     chunk.end_line
     chunk.token_estimate
-    chunk.oversized       # True only for an indivisible code block, table, or list item
+    chunk.oversized       # True only for an indivisible code block, table row, or list item
     chunk.to_dict()       # the JSONL record
 ```
 

@@ -1,4 +1,4 @@
-from rag_chunker.blocks import Block, parse_blocks, split_list_items
+from rag_chunker.blocks import Block, parse_blocks, split_list_items, split_table_rows
 
 
 def test_heading_strips_trailing_hashes():
@@ -124,3 +124,31 @@ def test_split_list_items_keeps_continuation_lines_with_their_item():
 def test_split_list_items_on_non_list_block_returns_it_unchanged():
     block = parse_blocks("Just a paragraph.\n")[0]
     assert split_list_items(block) == [block]
+
+
+def test_split_table_rows_repeats_header_and_separator_per_row():
+    text = "| a | b |\n| -- | -- |\n| 1 | 2 |\n| 3 | 4 |\n"
+    block = parse_blocks(text)[0]
+    rows = split_table_rows(block)
+    assert [row.text for row in rows] == [
+        "| a | b |\n| -- | -- |\n| 1 | 2 |",
+        "| a | b |\n| -- | -- |\n| 3 | 4 |",
+    ]
+    assert all(row.type == "table" for row in rows)
+
+
+def test_split_table_rows_tracks_line_numbers():
+    text = "| a | b |\n| -- | -- |\n| 1 | 2 |\n| 3 | 4 |\n"
+    block = parse_blocks(text)[0]
+    rows = split_table_rows(block)
+    assert [(row.start_line, row.end_line) for row in rows] == [(1, 3), (1, 4)]
+
+
+def test_split_table_rows_on_header_only_table_returns_it_unchanged():
+    block = parse_blocks("| a | b |\n| -- | -- |\n")[0]
+    assert split_table_rows(block) == [block]
+
+
+def test_split_table_rows_on_non_table_block_returns_it_unchanged():
+    block = parse_blocks("Just a paragraph.\n")[0]
+    assert split_table_rows(block) == [block]

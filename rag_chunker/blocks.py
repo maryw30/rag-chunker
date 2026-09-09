@@ -100,6 +100,27 @@ def split_list_items(block):
     return items
 
 
+def split_table_rows(block):
+    # each piece repeats the header and separator so a lone row is still
+    # readable on its own, the way split_list_items keeps continuation lines
+    # attached to their item
+    if block.type != "table":
+        return [block]
+    lines = block.text.splitlines()
+    if len(lines) < 3:
+        return [block]
+
+    header, separator = lines[0], lines[1]
+    data_rows = lines[2:]
+    row_line = block.start_line + 2
+    items = []
+    for row in data_rows:
+        text = "\n".join([header, separator, row])
+        items.append(Block("table", text, block.start_line, row_line, 0))
+        row_line += 1
+    return items
+
+
 def _parse_code_block(lines, start, n):
     fence_char = lines[start].strip()[0]
     fence_len = len(lines[start].strip()) - len(lines[start].strip().lstrip(fence_char))
