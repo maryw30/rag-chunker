@@ -97,6 +97,18 @@ def test_a_single_oversized_table_row_is_flagged_oversized():
     assert chunks[0].oversized is True
 
 
+def test_a_long_multiline_code_block_splits_across_chunks():
+    doc = (
+        "# T\n\n```\n"
+        + "\n".join(f"line {i} with several words here" for i in range(20))
+        + "\n```\n"
+    )
+    chunks = chunk_markdown(doc, max_tokens=8, overlap=0)
+    assert len(chunks) > 1
+    assert chunks[0].start_line == 4
+    assert chunks[-1].end_line == 23
+
+
 def test_small_paragraph_is_not_flagged_oversized():
     doc = "# T\n\nShort.\n"
     chunks = chunk_markdown(doc, max_tokens=512, overlap=0)

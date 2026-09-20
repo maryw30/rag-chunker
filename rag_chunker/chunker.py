@@ -2,7 +2,7 @@ import json
 from collections import namedtuple
 from dataclasses import dataclass, field
 
-from .blocks import parse_blocks, split_list_items, split_table_rows
+from .blocks import parse_blocks, split_code_lines, split_list_items, split_table_rows
 from .sentences import split_sentences
 from .tokens import estimate_tokens
 
@@ -79,7 +79,7 @@ def _iter_sections(blocks):
         yield current_path, current_blocks
 
 
-def _build_pieces(blocks):
+def _build_pieces(blocks, max_tokens):
     pieces = []
     for block in blocks:
         if block.type == "paragraph":
@@ -91,6 +91,9 @@ def _build_pieces(blocks):
         elif block.type == "table":
             for row in split_table_rows(block):
                 pieces.append(_Piece(row.text, row, True))
+        elif block.type == "code":
+            for piece in split_code_lines(block, max_tokens):
+                pieces.append(_Piece(piece.text, piece, True))
         else:
             pieces.append(_Piece(block.text, block, True))
     return pieces
@@ -120,7 +123,7 @@ def _tail_by_tokens(text, overlap_tokens):
 
 def _chunk_section(heading_path, blocks, max_tokens, overlap, heading_prefix):
     prefix = " > ".join(heading_path) if heading_prefix and heading_path else ""
-    pieces = _build_pieces(blocks)
+    pieces = _build_pieces(blocks, max_tokens)
     if not pieces:
         return []
 

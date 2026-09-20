@@ -10,9 +10,10 @@ miss that is hard to trace. `rag-chunker` fixes them at chunking time:
 
 - **Chunks never span a heading**, and each chunk carries its heading path as a
   context prefix (`Runbook > Checks > Rollback`).
-- **Code blocks are atomic.** They are emitted whole, and flagged as
-  `oversized` if that means exceeding the budget, so you can decide what to do
-  rather than discovering half a function in your index.
+- **Code blocks stay whole whenever they fit.** A block that can't possibly
+  fit the budget on its own is split by line as a last resort, each piece
+  re-fenced so it still renders as valid code, and flagged as `oversized`
+  only if a single line alone still exceeds the budget.
 - **List items and table rows pack individually**, like sentences in a
   paragraph, so a long list or table fills chunks efficiently instead of
   forcing the whole block into one oversized chunk. Table rows carry their
@@ -101,7 +102,7 @@ for chunk in chunks:
     chunk.start_line      # 1-based, points back at the source file
     chunk.end_line
     chunk.token_estimate
-    chunk.oversized       # True only for an indivisible code block, table row, or list item
+    chunk.oversized       # True only for an indivisible code line, table row, or list item
     chunk.to_dict()       # the JSONL record
 ```
 

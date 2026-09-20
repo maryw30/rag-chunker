@@ -1,4 +1,10 @@
-from rag_chunker.blocks import Block, parse_blocks, split_list_items, split_table_rows
+from rag_chunker.blocks import (
+    Block,
+    parse_blocks,
+    split_code_lines,
+    split_list_items,
+    split_table_rows,
+)
 
 
 def test_heading_strips_trailing_hashes():
@@ -152,3 +158,48 @@ def test_split_table_rows_on_header_only_table_returns_it_unchanged():
 def test_split_table_rows_on_non_table_block_returns_it_unchanged():
     block = parse_blocks("Just a paragraph.\n")[0]
     assert split_table_rows(block) == [block]
+
+
+def test_split_code_lines_leaves_a_block_that_fits_unchanged():
+    block = parse_blocks("```\nprint('hi')\n```\n")[0]
+    assert split_code_lines(block, max_tokens=512) == [block]
+
+
+def test_split_code_lines_on_non_code_block_returns_it_unchanged():
+    block = parse_blocks("Just a paragraph.\n")[0]
+    assert split_code_lines(block, max_tokens=5) == [block]
+
+
+def test_split_code_lines_keeps_a_single_body_line_whole_even_if_oversized():
+    block = parse_blocks("```\n" + "x" * 200 + "\n```\n")[0]
+    assert split_code_lines(block, max_tokens=5) == [block]
+
+
+def test_split_code_lines_breaks_a_long_closed_block_into_fenced_pieces():
+    text = "```\n" + "\n".join(f"line {i} with several words here" for i in range(8)) + "\n```\n"
+    block = parse_blocks(text)[0]
+    pieces = split_code_lines(block, max_tokens=6)
+    assert len(pieces) > 1
+    assert all(piece.type == "code" for piece in pieces)
+    assert all(piece.text.startswith("```") and piece.text.endswith("```") for piece in pieces)
+
+    body_lines = block.text.splitlines()[1:-1]
+    reconstructed = []
+    for piece in pieces:
+        reconstructed.extend(piece.text.splitlines()[1:-1])
+    assert reconstructed == body_lines
+
+    assert pieces[0].start_line == block.start_line + 1
+    assert pieces[-1].end_line == block.end_line - 1
+    for earlier, later in zip(pieces, pieces[1:]):
+        assert later.start_line == earlier.end_line + 1
+
+
+def test_split_code_lines_handles_an_unterminated_fence():
+    text = "```\n" + "\n".join(f"line {i} with several words here" for i in range(8)) + "\n"
+    block = parse_blocks(text)[0]
+    pieces = split_code_lines(block, max_tokens=6)
+    assert len(pieces) > 1
+    assert all(piece.text.startswith("```") and piece.text.endswith("```") for piece in pieces)
+    assert pieces[0].start_line == block.start_line + 1
+    assert pieces[-1].end_line == block.end_line

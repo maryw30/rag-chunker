@@ -1,6 +1,8 @@
 import re
 from dataclasses import dataclass
 
+from .tokens import estimate_tokens
+
 _HEADING_RE = re.compile(r"^ {0,3}(#{1,6})(?:\s+(.*?))?\s*$")
 _LIST_ITEM_RE = re.compile(r"^\s{0,3}([-*+]|\d+[.)])\s+")
 _TABLE_SEP_RE = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
@@ -119,6 +121,54 @@ def split_table_rows(block):
         items.append(Block("table", text, block.start_line, row_line, 0))
         row_line += 1
     return items
+
+
+def split_code_lines(block, max_tokens):
+    # a code block is normally kept whole; only break it up when it can't
+    # possibly fit in a chunk on its own, and even then keep it fenced so
+    # each piece still renders as valid code by itself
+    if block.type != "code" or max_tokens <= 0:
+        return [block]
+    if estimate_tokens(block.text) <= max_tokens:
+        return [block]
+
+    lines = block.text.splitlines()
+    if len(lines) < 3:
+        return [block]
+
+    open_line = lines[0]
+    fence_char = open_line.strip()[0]
+    fence_len = len(open_line.strip()) - len(open_line.strip().lstrip(fence_char))
+    last_stripped = lines[-1].strip()
+    closed = len(last_stripped) >= fence_len and set(last_stripped) == {fence_char}
+    body_lines = lines[1:-1] if closed else lines[1:]
+    close_line = lines[-1] if closed else fence_char * max(fence_len, 3)
+
+    if len(body_lines) < 2:
+        return [block]
+
+    pieces = []
+    current = []
+    current_start = block.start_line + 1
+
+    def flush(end_line):
+        text = "\n".join([open_line] + current + [close_line])
+        pieces.append(Block("code", text, current_start, end_line, 0))
+
+    line_no = current_start
+    for line in body_lines:
+        trial = current + [line]
+        trial_text = "\n".join([open_line] + trial + [close_line])
+        if current and estimate_tokens(trial_text) > max_tokens:
+            flush(line_no - 1)
+            current = [line]
+            current_start = line_no
+        else:
+            current.append(line)
+        line_no += 1
+
+    flush(line_no - 1)
+    return pieces if len(pieces) > 1 else [block]
 
 
 def _parse_code_block(lines, start, n):
