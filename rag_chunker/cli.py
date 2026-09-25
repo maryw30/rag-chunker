@@ -14,6 +14,13 @@ def build_parser():
     parser.add_argument("--max-tokens", type=int, default=512, dest="max_tokens")
     parser.add_argument("--overlap", type=int, default=64)
     parser.add_argument(
+        "--min-tokens",
+        type=int,
+        default=None,
+        dest="min_tokens",
+        help="merge a section's trailing chunk into the one before it if under this size",
+    )
+    parser.add_argument(
         "--no-heading-prefix", action="store_false", dest="heading_prefix", default=True
     )
     parser.add_argument("--array", action="store_true")
@@ -58,6 +65,7 @@ def main(argv=None):
             max_tokens=args.max_tokens,
             overlap=args.overlap,
             heading_prefix=args.heading_prefix,
+            min_tokens=args.min_tokens,
         )
     except ValueError as exc:
         parser.error(str(exc))

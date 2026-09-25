@@ -80,13 +80,14 @@ rag-chunker doc.md --max-tokens 512 --overlap 64 | jq -r .text | your-embedder
 | --- | --- | --- |
 | `--max-tokens N` | `512` | Chunk size ceiling, heading prefix included |
 | `--overlap N` | `64` | Trailing tokens repeated in the next chunk of a section |
+| `--min-tokens N` | off | Merge a section's trailing chunk into the one before it if it lands under this size |
 | `--no-heading-prefix` | off | Do not prepend the heading path to the chunk text |
 | `--array` | off | Emit one indented JSON array instead of JSON lines |
 | `--stats` | off | Print a size summary to stderr |
 | `-o PATH` | stdout | Write the result to a file |
 
-Use `-` as the input path to read standard input. `--overlap` must be smaller
-than `--max-tokens`.
+Use `-` as the input path to read standard input. `--overlap` and `--min-tokens`
+must both be smaller than `--max-tokens`.
 
 ## Library API
 

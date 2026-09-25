@@ -156,11 +156,44 @@ def test_overlap_resets_at_a_new_heading():
         {"max_tokens": 0, "overlap": 0},
         {"max_tokens": 10, "overlap": -1},
         {"max_tokens": 10, "overlap": 10},
+        {"max_tokens": 10, "overlap": 0, "min_tokens": -1},
+        {"max_tokens": 10, "overlap": 0, "min_tokens": 10},
     ],
 )
 def test_invalid_arguments_raise_value_error(kwargs):
     with pytest.raises(ValueError):
         chunk_markdown("# T\n\nSome text.\n", **kwargs)
+
+
+def test_min_tokens_merges_a_tiny_trailing_chunk_into_the_one_before_it():
+    doc = (
+        "This is a longer leading sentence with quite a few extra words in it today. "
+        "Short one."
+    )
+    without_merge = chunk_markdown(doc, max_tokens=6, overlap=0, heading_prefix=False)
+    assert len(without_merge) == 2
+
+    merged = chunk_markdown(
+        doc, max_tokens=6, overlap=0, heading_prefix=False, min_tokens=3
+    )
+    assert len(merged) == 1
+    assert merged[0].body == (
+        "This is a longer leading sentence with quite a few extra words in it today.\n\n"
+        "Short one."
+    )
+
+
+def test_min_tokens_leaves_a_lone_chunk_alone():
+    doc = "Only one short sentence."
+    chunks = chunk_markdown(doc, max_tokens=512, overlap=0, heading_prefix=False, min_tokens=5)
+    assert len(chunks) == 1
+
+
+def test_min_tokens_does_not_merge_across_a_heading_boundary():
+    doc = "# A\n\nFairly long padded sentence here for the section.\n\n# B\n\nTiny.\n"
+    chunks = chunk_markdown(doc, max_tokens=8, overlap=0, min_tokens=6)
+    assert [c.heading_path for c in chunks] == [["A"], ["B"]]
+    assert chunks[1].body == "Tiny."
 
 
 def test_to_dict_and_jsonl_round_trip():

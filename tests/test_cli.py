@@ -15,6 +15,7 @@ def test_build_parser_defaults():
     assert args.input == "doc.md"
     assert args.max_tokens == 512
     assert args.overlap == 64
+    assert args.min_tokens is None
     assert args.heading_prefix is True
     assert args.array is False
     assert args.stats is False
@@ -95,3 +96,15 @@ def test_main_errors_when_overlap_is_not_smaller_than_max_tokens(tmp_path, capsy
     with pytest.raises(SystemExit):
         main([str(doc_path), "--max-tokens", "10", "--overlap", "10"])
     assert "overlap must be smaller than max_tokens" in capsys.readouterr().err
+
+
+def test_main_min_tokens_flag_merges_tiny_trailing_chunks(tmp_path, capsys):
+    doc_path = tmp_path / "doc.md"
+    doc_path.write_text(DOC, encoding="utf-8")
+
+    main([str(doc_path), "--max-tokens", "20", "--overlap", "0", "--min-tokens", "10"])
+
+    expected = chunks_to_jsonl(
+        chunk_markdown(DOC, max_tokens=20, overlap=0, min_tokens=10)
+    )
+    assert capsys.readouterr().out == expected + "\n"

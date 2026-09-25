@@ -31,19 +31,26 @@ class Chunk:
         }
 
 
-def chunk_markdown(text, max_tokens=512, overlap=64, heading_prefix=True):
+def chunk_markdown(text, max_tokens=512, overlap=64, heading_prefix=True, min_tokens=None):
     if max_tokens <= 0:
         raise ValueError("max_tokens must be positive")
     if overlap < 0:
         raise ValueError("overlap must not be negative")
     if overlap >= max_tokens:
         raise ValueError("overlap must be smaller than max_tokens")
+    if min_tokens is not None:
+        if min_tokens < 0:
+            raise ValueError("min_tokens must not be negative")
+        if min_tokens >= max_tokens:
+            raise ValueError("min_tokens must be smaller than max_tokens")
 
     blocks = parse_blocks(text)
     chunks = []
     for heading_path, section_blocks in _iter_sections(blocks):
         chunks.extend(
-            _chunk_section(heading_path, section_blocks, max_tokens, overlap, heading_prefix)
+            _chunk_section(
+                heading_path, section_blocks, max_tokens, overlap, heading_prefix, min_tokens
+            )
         )
 
     for i, chunk in enumerate(chunks):
@@ -121,36 +128,39 @@ def _tail_by_tokens(text, overlap_tokens):
     return " ".join(tail_words)
 
 
-def _chunk_section(heading_path, blocks, max_tokens, overlap, heading_prefix):
+def _build_chunk(heading_path, prefix, carry, pieces, max_tokens):
+    body = _body_of(carry, pieces)
+    text_value = _render(prefix, body)
+    token_estimate = estimate_tokens(text_value)
+    oversized = token_estimate > max_tokens and any(
+        piece.block.type in ("code", "table", "list") for piece in pieces
+    )
+    return Chunk(
+        index=0,
+        text=text_value,
+        body=body,
+        heading_path=list(heading_path),
+        start_line=pieces[0].block.start_line,
+        end_line=pieces[-1].block.end_line,
+        token_estimate=token_estimate,
+        oversized=oversized,
+    )
+
+
+def _chunk_section(heading_path, blocks, max_tokens, overlap, heading_prefix, min_tokens=None):
     prefix = " > ".join(heading_path) if heading_prefix and heading_path else ""
     pieces = _build_pieces(blocks, max_tokens)
     if not pieces:
         return []
 
-    results = []
+    records = []
     current = []
     carry = ""
 
     def flush(keep_overlap):
         nonlocal current, carry
+        records.append((carry, current))
         body = _body_of(carry, current)
-        text_value = _render(prefix, body)
-        token_estimate = estimate_tokens(text_value)
-        oversized = token_estimate > max_tokens and any(
-            piece.block.type in ("code", "table", "list") for piece in current
-        )
-        results.append(
-            Chunk(
-                index=0,
-                text=text_value,
-                body=body,
-                heading_path=list(heading_path),
-                start_line=current[0].block.start_line,
-                end_line=current[-1].block.end_line,
-                token_estimate=token_estimate,
-                oversized=oversized,
-            )
-        )
         carry = _tail_by_tokens(body, overlap) if keep_overlap and overlap > 0 else ""
         current = []
 
@@ -169,4 +179,17 @@ def _chunk_section(heading_path, blocks, max_tokens, overlap, heading_prefix):
             current.append(piece)
 
     flush(keep_overlap=False)
-    return results
+
+    if min_tokens is not None:
+        while len(records) > 1:
+            last_carry, last_pieces = records[-1]
+            trailing = _build_chunk(heading_path, prefix, last_carry, last_pieces, max_tokens)
+            if trailing.token_estimate >= min_tokens:
+                break
+            prev_carry, prev_pieces = records[-2]
+            records[-2:] = [(prev_carry, prev_pieces + last_pieces)]
+
+    return [
+        _build_chunk(heading_path, prefix, carry, pieces, max_tokens)
+        for carry, pieces in records
+    ]
